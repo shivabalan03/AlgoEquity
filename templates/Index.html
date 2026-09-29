@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Equity Trading Signals</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding-top: 70px; }
+    .controls .form-control { min-width: 160px; }
+    .table-wrap { max-height: 60vh; overflow:auto; }
+    .small-cell { font-size:0.9rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">Equity Signals</a>
+      <div class="ms-auto text-white small">Live | <span id="statusBadge" class="badge bg-light text-dark">Stopped</span></div>
+    </div>
+  </nav>
+
+  <main class="container-fluid">
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-5">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Controls</h5>
+            <div class="row g-2">
+              <div class="col-6 col-sm-3 col-md-2">
+                <input id="encToken" class="form-control" placeholder="Enc Token" />
+              </div>
+              <div class="col-6 col-sm-3 col-md-2">
+                <input id="stock" class="form-control" placeholder="Stock (e.g. GLENMARK)" />
+              </div>
+              <div class="col-6 col-sm-3 col-md-2">
+                <input id="quantity" class="form-control" placeholder="Qty" type="number" min="1" />
+              </div>
+              <div class="col-6 col-sm-3 col-md-2">
+                <input id="stoploss" class="form-control" placeholder="Stop Loss" type="number" min="100" />
+              </div>
+              <div class="col-6 col-sm-3 col-md-2">
+                <select id="sprTrend" class="form-select">
+                  <option value="None">Trend</option>
+                  <option value="103">(10,3)</option>
+                  <option value="73">(7,3)</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-8 col-md-6 d-flex gap-2">
+                <button id="btnStart" class="btn btn-success w-50" onclick="start()">Start</button>
+                <button id="btnStop" class="btn btn-outline-danger w-50" onclick="stop()">Stop</button>
+              </div>
+              <!-- <div class="col-12 col-md-6 small text-muted">
+                <div>Last updated: <span id="lastUpdated">-</span></div>
+                <div>Available Qty: <span id="availQty">0</span></div>
+              </div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-7">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title mb-2">Summary</h5>
+            <div class="row">              
+              <div class="col-6">
+                <div class="small text-muted">Current P&L</div>
+                <div id="currentPL" class="fw-medium">-</div>
+              </div>
+              <div class="col-6">
+                <div class="small text-muted">Available Quantity</div>
+                <div id="availQty" class="fw-medium">-</div>
+              </div>
+              <div class="col-6">
+                <div class="small text-muted">Message</div>
+                <div id="message" class="fw-medium">-</div>
+              </div>
+              <div class="col-6">
+                <div class="small text-muted">Transaction</div>
+                <div id="transactionType" class="fw-medium">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body table-wrap">
+        <div class="table-responsive">
+          <table id="Equity" class="table table-striped table-hover table-sm align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Time</th>
+                <th>Stock</th>
+                <th>Trend</th>
+                <th class="small-cell">Open</th>
+                <th class="small-cell">High</th>
+                <th class="small-cell">Low</th>
+                <th class="small-cell">Close</th>
+                <th class="small-cell">Avg</th>
+                <th class="small-cell">Stop Loss</th>
+                <th>Txn</th>
+                <th>Message</th>
+                <th>Avail Qty</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+  // ...existing code...
+  $(document).ready(function(){
+    class params { 
+        constructor(stock, encToken, quantity, sprTrend, stoploss) { 
+            this.stock=stock; this.encToken=encToken; this.quantity=quantity; this.sprTrend=sprTrend; this.stoploss=stoploss;
+        } 
+    }
+    window.validate = function() { 
+        let param = JSON.parse(sessionStorage.getItem("equityParams")||'{"stock":"","encToken":"","quantity":0}'); 
+        if(!param.stock||!param.encToken || param.sprTrend == "None" ||param.quantity<=0){ 
+            alert("Please provide valid inputs."); 
+            return false;
+        } 
+        return true; 
+    }
+
+    window.getData = function(){
+      if(!window.validate()) return;
+      return new Promise(function(resolve){
+        let param = JSON.parse(sessionStorage.getItem("equityParams"));
+        document.getElementById("encToken").value = param.encToken;
+        document.getElementById("quantity").value = param.quantity;
+        document.getElementById("stock").value = param.stock;
+        document.getElementById("sprTrend").value = param.sprTrend || "None";
+        document.getElementById("stoploss").value = param.stoploss || "100";
+        $.ajax({
+          url: '/getDataEQ2', type:'POST', data: JSON.stringify(param),
+          contentType:'application/json', dataType:'json',
+          complete: function(i){
+            try {
+              let info = JSON.parse(i.responseText);
+              $("#lastUpdated").text(info.common.dateTime || '-');
+              $("#availQty").text(info.common.availableQuantity || 0);
+              $("#message").text(info.common.message || '-');
+              $("#transactionType").text(info.common.transactionType || '-');
+              var html = "<tr>";
+              html += "<td>" + info.common.dateTime + "</td>";
+              html += "<td>" + info.stock.stockName + "</td>";
+              html += "<td>" + info.trendInfo.recentT + "</td>";
+              html += "<td>" + Math.round(info.trendInfo.o||0) + "</td>";
+              html += "<td>" + Math.round(info.trendInfo.h||0) + "</td>";
+              html += "<td>" + Math.round(info.trendInfo.l||0) + "</td>";
+              html += "<td>" + Math.round(info.trendInfo.c||0) + "</td>";
+              html += "<td>" + Math.round(info.trendInfo.a||0) + "</td>";
+              html += "<td>" + Math.round(info.trendInfo.sl||0) + "</td>";
+              html += "<td>" + (info.common.transactionType||'') + "</td>";
+              html += "<td>" + (info.common.message||'') + "</td>";
+              html += "<td>" + (info.common.availableQuantity || 0) + "</td>";
+              html += "</tr>";
+              $("#Equity tbody").prepend(html);
+              $("#availQty").text(info.common.availableQuantity || '-');
+              if(info.common.currentPnl >= 0){
+                $("#currentPL").css("color", "green");                
+                $("#currentPL").text("+" + parseFloat(info.common.currentPnl || 0).toFixed(2) || '-');
+              } else {
+                $("#currentPL").css("color", "red");
+                $("#currentPL").text(parseFloat(info.common.currentPnl || 0).toFixed(2) || '-');
+              }
+              if(info.StopAlgo){
+                if(info.exit_reason == "Before 9:15 AM - Market Not Open") {
+                  
+                } else {
+                  window.stop();
+                  $("#message").css("color", "red");
+                  $("#message").text("Stop Loss Reached - Algo Stopped");
+                  alert("Stop Loss Reached. Algo Stopped.");
+                }
+              }
+              resolve('success');
+            } catch(e){ console.error("Invalid response", e); resolve('error'); }
+          }
+        });
+      });
+    }
+
+    window.start = function() {
+      sessionStorage.setItem("isFunctionStarted","true");
+      document.getElementById("btnStart").textContent = "Started";
+      $("#statusBadge").text("Running").removeClass("bg-light text-dark").addClass("badge bg-success");
+      let param = new params($("#stock").val(), $("#encToken").val(), $("#quantity").val(), $("#sprTrend").val(), $("#stoploss").val());
+      sessionStorage.setItem("equityParams", JSON.stringify(param));
+      window.getData();
+    }
+
+    window.stop = function() {
+      sessionStorage.setItem("isFunctionStarted","false");
+      document.getElementById("btnStart").textContent = "Start";
+      $("#statusBadge").text("Stopped").removeClass("badge bg-success").addClass("bg-light text-dark");
+    }
+
+    try {
+      if(sessionStorage.getItem("isFunctionStarted")==="true") { 
+        window.getData(); 
+        document.getElementById("btnStart").textContent = "Started"; 
+        $("#statusBadge").text("Running").addClass("badge bg-success"); 
+    }
+    } catch(e){}
+
+    setInterval(function(){
+        try { 
+            if(sessionStorage.getItem("isFunctionStarted")==="true") { 
+                window.getData(); 
+            } 
+        } catch(e){}
+    }, 60000);
+  });
+  </script>
+</body>
+</html>
