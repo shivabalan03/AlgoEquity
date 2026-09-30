@@ -112,6 +112,14 @@ class Equity:
 
             _state.data1["trendInfo"]["currentT"] = trendInfo["STX"].iloc[-1]
 
+            adx_period = 14
+            if len(history) > adx_period:
+                adx_series = _state.kiteNew.ADX(history, adx_period)
+                _state.data1["trendInfo"]["adx"] = float(adx_series.iloc[-1])
+            else:
+                print("Not enough history rows for ADX:", len(history))
+                _state.data1["trendInfo"]["adx"] = 0
+
             if len(_state.data1["trendInfo"]["recentT"]) >= 3:
                 _state.data1["trendInfo"]["recentT"].pop(0)
                 _state.data1["trendInfo"]["recentT"].append(_state.data1["trendInfo"]["currentT"])
@@ -128,7 +136,7 @@ class Equity:
         self.currentPostions()
         self.setInstrumentToken()
 
-    def decide_action(self, atr_multiplier=1.5, max_layers=2, max_risk_qty=None):
+    def decide_action(self, atr_multiplier=1.5, max_layers=2, max_risk_qty=None, adx_threshold=20):
         """
         Decide next action based on data1 state and last_trend_df.
         Returns:
@@ -145,6 +153,9 @@ class Equity:
         last3 = recent[-3:]
         if not (last3[0] == last3[1] == last3[2]):
             return None
+
+        adx_value = float(_state.data1["trendInfo"].get("adx") or 0)
+        adx_ok = adx_value >= adx_threshold
 
         prev = _state.data1["trendInfo"]["previousT"]
         price = float(_state.data1["trendInfo"]["c"] or 0)
@@ -163,7 +174,11 @@ class Equity:
 
         stop_dist = atr_value * atr_multiplier
 
+        # Only block brand-new entries when trend strength is weak - avoids opening fresh whipsaw trades
         if avail_qty == 0 and (prev != last3[0] or prev == ""):
+            if not adx_ok:
+                print(f"ADX filter: skipping new entry, ADX {adx_value:.2f} below threshold {adx_threshold} (weak/ranging trend)")
+                return None
             if last3[0]:  # uptrend -> BUY
                 stop = _state.data1["trendInfo"].get("sl") or max(price - stop_dist, 0)
                 return {"action": "BUY", "reverse": False, "qty": planned, "stop": stop, "reason": "enter_long_confirmed"}
@@ -171,15 +186,23 @@ class Equity:
                 stop = _state.data1["trendInfo"].get("sl") or (price + stop_dist)
                 return {"action": "SELL", "reverse": False, "qty": planned, "stop": stop, "reason": "enter_short_confirmed"}
 
+        # Existing position always follows a confirmed trend flip - never hold blind against the trend.
+        # Size the reversal down to a plain flip (no 2x layering) when trend strength is weak.
         if avail_qty != 0 and last3[0] != prev:
-            reverse_qty = min(abs(avail_qty) * 2, planned * max_layers)
-            reverse_qty = max(int(reverse_qty), planned)
+            if adx_ok:
+                reverse_qty = min(abs(avail_qty) * 2, planned * max_layers)
+                reverse_qty = max(int(reverse_qty), planned)
+                reason_suffix = ""
+            else:
+                reverse_qty = abs(avail_qty)
+                reason_suffix = "_weak_adx_flip_only"
+                print(f"ADX filter: weak trend (ADX {adx_value:.2f}) - flipping to flat+opposite without doubling size")
             if last3[0]:
                 stop = _state.data1["trendInfo"].get("sl") or max(price - stop_dist, 0)
-                return {"action": "BUY", "reverse": True, "qty": reverse_qty, "stop": stop, "reason": "reverse_to_long"}
+                return {"action": "BUY", "reverse": True, "qty": reverse_qty, "stop": stop, "reason": f"reverse_to_long{reason_suffix}"}
             else:
                 stop = _state.data1["trendInfo"].get("sl") or (price + stop_dist)
-                return {"action": "SELL", "reverse": True, "qty": reverse_qty, "stop": stop, "reason": "reverse_to_short"}
+                return {"action": "SELL", "reverse": True, "qty": reverse_qty, "stop": stop, "reason": f"reverse_to_short{reason_suffix}"}
 
         return None
 

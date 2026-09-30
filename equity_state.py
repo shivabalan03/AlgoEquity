@@ -28,6 +28,7 @@ data1 = {
         "c": 0,
         "a": 0,
         "sl": 0,
+        "adx": 0,
         "recentT": [],
         "previousT": "",
         "currentT": "",

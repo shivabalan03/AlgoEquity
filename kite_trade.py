@@ -2,7 +2,6 @@ import csv
 import io
 import datetime as dt
 from typing import Any, Dict, List, Optional
-
 import pandas as pd
 import requests
 
@@ -210,3 +209,36 @@ class ZerodhaKiteTrade:
         out["ST"] = st
         out["STX"] = stx
         return out
+
+    @staticmethod
+    def ADX(df: pd.DataFrame, period: int = 14) -> pd.Series:
+        """Wilder's Average Directional Index - measures trend strength (0-100)."""
+        if df is None or len(df) == 0:
+            raise ValueError("Input dataframe is empty")
+        for col in ("high", "low", "close"):
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")
+
+        high = df["high"]
+        low = df["low"]
+        close = df["close"]
+
+        up_move = high.diff()
+        down_move = -low.diff()
+
+        plus_dm = ((up_move > down_move) & (up_move > 0)) * up_move
+        minus_dm = ((down_move > up_move) & (down_move > 0)) * down_move
+
+        tr1 = (high - low).abs()
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+        smoothed_tr = tr.ewm(alpha=1 / period, adjust=False).mean()
+        plus_di = 100 * (plus_dm.ewm(alpha=1 / period, adjust=False).mean() / smoothed_tr)
+        minus_di = 100 * (minus_dm.ewm(alpha=1 / period, adjust=False).mean() / smoothed_tr)
+
+        di_sum = (plus_di + minus_di).replace(0, pd.NA)
+        dx = 100 * (plus_di - minus_di).abs() / di_sum
+        adx = dx.ewm(alpha=1 / period, adjust=False).mean()
+        return adx.fillna(0)

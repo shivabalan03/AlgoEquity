@@ -110,6 +110,7 @@ def mainMethod():
                       "close": data1["trendInfo"]["c"],
                       "average": data1["trendInfo"]["a"],
                       "stopLoss": data1["trendInfo"]["sl"],
+                      "adx": data1["trendInfo"]["adx"],
                       "transactionType": data1["common"]["transactionType"],
                       "message": data1["common"]["message"],
                       "availableQty": data1["common"]["availableQuantity"],
