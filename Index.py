@@ -8,6 +8,8 @@ from equity import Equity
 from equity_state import data1
 import equity_state as _state
 
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30), name="IST")
+
 app = Flask(__name__)
 
 @app.route('/')
@@ -35,12 +37,13 @@ def mainMethod():
 
     try:                        
         equity.setAllData() 
-        data1["common"]["dateTime"] = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+        now_ist = datetime.datetime.now(IST)
+        data1["common"]["dateTime"] = now_ist.strftime("%Y-%m-%d %I:%M:%S %p")
         data1["common"]["message"] = ""
         data1["common"]["transactionType"] = ""
 
         # Trading flag is TRUE only during market hours and when stop-loss is not hit.
-        current_time = datetime.datetime.now().time()
+        current_time = now_ist.time()
         exit_time = datetime.time(15, 10)  # 3:10 PM
         enter_time = datetime.time(9, 15)  # 9:15 AM
 
