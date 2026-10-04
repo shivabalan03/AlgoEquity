@@ -10,13 +10,17 @@
     .controls .form-control { min-width: 160px; }
     .table-wrap { max-height: 60vh; overflow:auto; }
     .small-cell { font-size:0.9rem; }
+    #currentTime { min-width: 15ch; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">Equity Signals</a>
-      <div class="ms-auto text-white small">Live | <span id="statusBadge" class="badge bg-light text-dark">Stopped</span></div>
+      <div class="ms-auto text-white small d-flex flex-column flex-sm-row align-items-end align-items-sm-center gap-1 gap-sm-3">
+        <div>Live | <span id="statusBadge" class="badge bg-light text-dark">Stopped</span></div>
+        <time id="currentTime" aria-label="Current time in IST"></time>
+      </div>
     </div>
   </nav>
 
@@ -117,6 +121,18 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+  const clockFormatter = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+  });
+  function updateClock() {
+    const now = new Date();
+    const clock = document.getElementById('currentTime');
+    clock.textContent = clockFormatter.format(now) + ' IST';
+    clock.dateTime = now.toISOString();
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
   // ...existing code...
   $(document).ready(function(){
     class params { 
